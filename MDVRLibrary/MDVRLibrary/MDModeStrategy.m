@@ -9,16 +9,19 @@
 #import "MDModeStrategy.h"
 
 @interface MDModeManager(){
-
 }
+@property(nonatomic,strong) NSArray* mModes;
+
 @end
+
+
 @implementation MDModeManager
 
-- (instancetype)initWithDefault:(int)mode
-{
+- (instancetype)initWithDefault:(int)mode{
     self = [super init];
     if (self) {
         _mMode = mode;
+        self.mModes = [self createModes];
     }
     return self;
 }
@@ -28,19 +31,21 @@
 }
 
 - (void) initMode:(int)mode{
-    if (self.mStrategy != nil) {
-        [self.mStrategy off];
-    }
+    [self off];
     self.mStrategy = [self createStrategy:self.mMode];
     [self on];
 }
 
 -(void) on{
-    [self.mStrategy on];
+    if ([self.mStrategy respondsToSelector:@selector(on)]) {
+        [self.mStrategy on];
+    }
 }
 
 -(void) off{
-    [self.mStrategy off];
+    if ([self.mStrategy respondsToSelector:@selector(off)]) {
+        [self.mStrategy off];
+    }
 }
 
 - (void) switchMode:(int)mode{
@@ -49,9 +54,17 @@
     [self initMode:self.mMode];
 }
 
+- (void) switchMode{
+    NSUInteger index = [self.mModes indexOfObject:[NSNumber numberWithInt:self.mMode]];
+    index ++;
+    NSNumber* nextMode = [self.mModes objectAtIndex:(index % self.mModes.count)];
+    [self switchMode:[nextMode intValue]];
+}
+
+
 #pragma mark abstract
-- (void) switchMode{}
-- (id<IMDModeStrategy>) createStrategy:(int)mode{ return nil; }
+- (id) createStrategy:(int)mode{ return nil; }
+- (NSArray*) createModes{ return nil; }
 @end
 
 

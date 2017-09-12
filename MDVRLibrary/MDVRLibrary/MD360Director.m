@@ -67,7 +67,6 @@ static float sNear = 0.7f;
 }
 
 - (void) setup{
-    
     [self initCamera];
     [self initModel];
 }
@@ -96,15 +95,15 @@ static float sNear = 0.7f;
     mModelMatrix = GLKMatrix4Identity;
     
     mCurrentRotation = GLKMatrix4Identity;
-
-    mCurrentRotation = GLKMatrix4Rotate(mCurrentRotation, MD_DEGREES_TO_RADIANS(-mDeltaY + mAngleY), 1.0f, 0.0f, 0.0f);
     
-    mCurrentRotation = GLKMatrix4Rotate(mCurrentRotation, MD_DEGREES_TO_RADIANS(-mDeltaX + mAngleX), 0.0f, 1.0f, 0.0f);
+    mCurrentRotation = GLKMatrix4Rotate(mCurrentRotation, GLKMathDegreesToRadians(-mDeltaX + mAngleX), 0.0f, 1.0f, 0.0f);
     
     mCurrentRotation = GLKMatrix4Multiply(mSensorMatrix, mCurrentRotation);
     
     // set the accumulated rotation to the result.
     mAccumulatedRotation = mCurrentRotation;
+    
+    mModelMatrix = GLKMatrix4Rotate(mModelMatrix, GLKMathDegreesToRadians(-mDeltaY + mAngleY), 1.0f, 0.0f, 0.0f);
     
     // Rotate the cube taking the overall rotation into account.
     mTemporaryMatrix = GLKMatrix4Multiply(mModelMatrix, mAccumulatedRotation);
@@ -133,17 +132,12 @@ static float sNear = 0.7f;
 
 - (void) updateProjection:(int)width height:(int)height{
     mRatio = width * 1.0f / height;
-    [self updateProjectionNearScale:mNearScale];
+    [self updateProjection];
 }
 
 - (void) updateProjectionNearScale:(float)scale{
     mNearScale = scale;
-    float left = -mRatio/2;
-    float right = mRatio/2;
-    float bottom = -0.5f;
-    float top = 0.5f;
-    float far = 500;
-    mProjectionMatrix = GLKMatrix4MakeFrustum(left, right, bottom, top, mNearScale * sNear, far);
+    [self updateProjection];
 }
 
 - (void) updateModelRotateAngleX:(float)angleX angleY:(float)angleY {
@@ -165,6 +159,15 @@ static float sNear = 0.7f;
     mViewMatrix = GLKMatrix4MakeLookAt(eyeX, eyeY, eyeZ, lookX, lookY, lookZ, upX, upY, upZ);
 }
 
+- (void) updateProjection{
+    float left = -mRatio/2;
+    float right = mRatio/2;
+    float bottom = -0.5f;
+    float top = 0.5f;
+    float far = 500;
+    mProjectionMatrix = GLKMatrix4MakeFrustum(left, right, bottom, top, [self getNear], far);
+}
+
 - (void) updateSensorMatrix:(GLKMatrix4)sensor{
     mSensorMatrix = sensor;
 }
@@ -172,6 +175,10 @@ static float sNear = 0.7f;
 - (void) updateTouch:(float)distX distY:(int)distY{
     mDeltaX += distX;
     mDeltaY += distY;
+}
+
+- (void) setProjection:(GLKMatrix4)project{
+    mProjectionMatrix = project;
 }
 
 - (void) setLookX:(float)lookX{
@@ -190,9 +197,17 @@ static float sNear = 0.7f;
     mAngleY = angleY;
 }
 
+- (float) getNear{
+    return mNearScale * sNear;
+}
+
+- (float) getRatio{
+    return mRatio;
+}
+
 @end
 
-#pragma mark 
+#pragma mark MD360DefaultDirectorFactory
 @implementation MD360DefaultDirectorFactory
 - (MD360Director*) createDirector:(int) index{
     MD360Director* director = [[MD360Director alloc]init];
@@ -207,4 +222,44 @@ static float sNear = 0.7f;
     [director setup];
     return director;
 }
+@end
+
+#pragma mark MD360OrthogonalDirectorFactory
+@interface OrthogonalDirector:MD360Director
+@end
+
+@implementation OrthogonalDirector
+- (void) updateTouch:(float)distX distY:(int)distY{
+    // nop
+}
+
+- (void) updateSensorMatrix:(GLKMatrix4)sensor{
+    // nop
+}
+
+- (void) updateProjectionNearScale:(float)scale{
+    // nop
+}
+
+- (void) updateProjection{
+    float left = - 1.0f;
+    float right = 1.0f;
+    float bottom = - 1.0f;
+    float top = 1.0f;
+    float far = 500;
+    
+    GLKMatrix4 projectionMatrix = GLKMatrix4MakeOrtho(left, right, bottom, top, [self getNear], far);
+    [self setProjection:projectionMatrix];
+    
+}
+@end
+
+@implementation MD360OrthogonalDirectorFactory
+
+- (MD360Director*) createDirector:(int) index{
+    MD360Director* director = [[OrthogonalDirector alloc]init];
+    [director setup];
+    return director;
+}
+
 @end

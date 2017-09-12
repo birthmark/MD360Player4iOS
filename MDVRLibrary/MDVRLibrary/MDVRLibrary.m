@@ -15,17 +15,20 @@
 #import "MDTouchHelper.h"
 #import "MDVideoDataAdatperAVPlayerImpl.h"
 #import "MDAbsObject3D.h"
-
-#define sMultiScreenSize 2
+#import "MDProjectionStrategy.h"
+#import "MDVRHeader.h"
+#import "MDAbsPlugin.h"
 
 @interface MDVRLibrary()<IAdvanceGestureListener>
 @property (nonatomic,strong) MD360Texture* texture;
-@property (nonatomic,strong) MDAbsObject3D* object3D;
+@property (nonatomic,strong) MD360Program* program;
 @property (nonatomic,strong) MDInteractiveStrategyManager* interactiveStrategyManager;
 @property (nonatomic,strong) MDDisplayStrategyManager* displayStrategyManager;
+@property (nonatomic,strong) MDProjectionStrategyManager* projectionStrategyManager;
+@property (nonatomic,strong) MDPluginManager* pluginManager;
 @property (nonatomic,strong) MD360Renderer* renderer;
-@property (nonatomic,strong) NSMutableArray* directors;
 @property (nonatomic,strong) MDTouchHelper* touchHelper;
+@property (nonatomic,strong) MDSizeContext* sizeContext;
 @property (nonatomic,weak) UIView* parentView;
 @end
 
@@ -39,7 +42,7 @@
     self = [super init];
     if (self) {
         self.touchHelper = [[MDTouchHelper alloc]init];
-        self.directors = [[NSMutableArray alloc]init];
+        self.sizeContext = [[MDSizeContext alloc]init];
     }
     return self;
 }
@@ -56,37 +59,26 @@
     
 }
 
-- (void) setupStrategyManager {
-    self.interactiveStrategyManager.dirctors = self.directors;
+- (void) setupStrategyManager{
+    self.interactiveStrategyManager.projectionStrategyManager = self.projectionStrategyManager;
+    [self.projectionStrategyManager prepare];
     [self.interactiveStrategyManager prepare];
     [self.displayStrategyManager prepare];
 }
 
-- (void) setupDirector:(id<MD360DirectorFactory>)factory{
-    
-    for (int i = 0; i < sMultiScreenSize; i++) {
-        if ([factory respondsToSelector:@selector(createDirector:)]) {
-            MD360Director* director = [factory createDirector:i];
-            [self.directors addObject:director];
-        }
-    }
-}
 
 - (void) setupDisplay:(UIViewController*)viewController view:(UIView*)parentView{
     MDGLKViewController* glkViewController = [[MDGLKViewController alloc] init];
     
     // renderer
     MD360RendererBuilder* builder = [MD360Renderer builder];
-    [builder setTexture:self.texture];
-    [builder setDirectors:self.directors];
-    [builder setObject3D:self.object3D];
     [builder setDisplayStrategyManager:self.displayStrategyManager];
+    [builder setProjectionStrategyManager:self.projectionStrategyManager];
+    [builder setPluginManager:self.pluginManager];
     self.renderer = [builder build];
     glkViewController.rendererDelegate = self.renderer;
     
-    float width = [[UIScreen mainScreen] bounds].size.width;
-    float height = [[UIScreen mainScreen] bounds].size.height;
-    [glkViewController.view setFrame:CGRectMake(0, 0, width, height)];
+    [glkViewController.view setFrame:parentView.frame];
     
     [parentView insertSubview:glkViewController.view atIndex:0];
     if (viewController != nil) {
@@ -101,7 +93,8 @@
 }
 
 - (void) onPinch:(float)scale{
-    for (MD360Director* dirctor in self.directors) {
+    NSArray* directors = [self.projectionStrategyManager getDirectors];
+    for (MD360Director* dirctor in directors) {
         [dirctor updateProjectionNearScale:scale];
     }
 }
@@ -132,19 +125,43 @@
     return self.displayStrategyManager.mMode;
 }
 
+#pragma mark ProjectionMode
+- (void) switchProjectionMode{
+    [self.projectionStrategyManager switchMode];
+}
+
+- (void) switchProjectionMode:(MDModeProjection)projectionMode{
+    [self.projectionStrategyManager switchMode:projectionMode];
+}
+
+- (MDModeProjection) getProjectionMode{
+    return self.projectionStrategyManager.mMode;
+}
+
+#pragma mark barrel distorion
+- (BOOL) isAntiDistortionEnabled {
+    return [self.displayStrategyManager isAntiDistortionEnabled];
+}
+
+- (void) setAntiDistortionEnabled:(BOOL)antiDistortionEnabled {
+    [self.displayStrategyManager setAntiDistortionEnabled:antiDistortionEnabled];
+}
+
 @end
 
 #pragma mark MDVRConfiguration
 @interface MDVRConfiguration()
 
 @property (nonatomic,readonly) MD360Texture* texture;
+@property (nonatomic,readonly) MD360Program* program;
 @property (nonatomic,readonly) UIViewController* viewController;
 @property (nonatomic,readonly) UIView* view;
 @property (nonatomic,readonly) MDModeInteractive interactiveMode;
 @property (nonatomic,readonly) MDModeDisplay displayMode;
+@property (nonatomic,readonly) MDModeProjection projectionMode;
 @property (nonatomic,readonly) bool pinchEnabled;
 @property (nonatomic,readonly) id<MD360DirectorFactory> directorFactory;
-@property (nonatomic,readonly) MDAbsObject3D* object3D;
+@property (nonatomic,readonly) BarrelDistortionConfig* barrelDistortionConfig;
 
 @end
 
@@ -161,16 +178,24 @@
 }
 - (void) asVideo:(AVPlayerItem*)playerItem{
     MDVideoDataAdatperAVPlayerImpl* adapter = [[MDVideoDataAdatperAVPlayerImpl alloc]initWithPlayerItem:playerItem];
-    _texture = [MD360VideoTexture createWithDataAdapter:adapter];
+    _texture = [MDRGBAVideoTexture createWithDataAdapter:adapter];
+    _program = [[MDRGBAProgram alloc] init];
 }
 
 - (void) asVideoWithDataAdatper:(id<MDVideoDataAdapter>)adapter{
-    _texture = [MD360VideoTexture createWithDataAdapter:adapter];
+    _texture = [MDRGBAVideoTexture createWithDataAdapter:adapter];
+    _program = [[MDRGBAProgram alloc] init];
+}
+
+- (void) asVideoWithYUV420PProvider:(id<IMDYUV420PProvider>)provider{
+    _texture = [MDYUV420PVideoTexture createWithProvider:provider];
+    _program = [[MDYUV420PProgram alloc] init];
 }
 
 - (void) asImage:(id<IMDImageProvider>)data{
     // nop
-    _texture = [MD360BitmapTexture createWithProvider:data];
+    _texture = [MDRGBABitmapTexture createWithProvider:data];
+    _program = [[MDRGBAProgram alloc] init];
 }
 
 - (void) interactiveMode:(MDModeInteractive)interactiveMode{
@@ -179,6 +204,10 @@
 
 - (void) displayMode:(MDModeDisplay)displayMode{
     _displayMode = displayMode;
+}
+
+- (void) projectionMode:(MDModeProjection)projectionMode{
+    _projectionMode = projectionMode;
 }
 
 - (void) pinchEnabled:(bool)pinch{
@@ -198,12 +227,8 @@
     _directorFactory = directorFactory;
 }
 
-- (void) displayAsDome{
-    _object3D = [[MDDome3D alloc]init];
-}
-
-- (void) displayAsSphere{
-    _object3D = [[MDSphere3D alloc]init];
+- (void) barrelDistortionConfig:(BarrelDistortionConfig*) config {
+    _barrelDistortionConfig = config;
 }
 
 - (MDVRLibrary*) build{
@@ -211,24 +236,105 @@
         _directorFactory = [[MD360DefaultDirectorFactory alloc]init];
     }
     
-    if (self.object3D == nil) {
-        [self displayAsSphere];
-    }
-    
     MDVRLibrary* library = [[MDVRLibrary alloc]init];
-    [library setupDirector:self.directorFactory];
+    
+    // texture
     library.texture = self.texture;
-    library.object3D = self.object3D;
+    library.texture.sizeContext = library.sizeContext;
+    
+    // program
+    library.program = self.program;
+    
+    // parent view
     library.parentView = self.view;
+    
+    // all strategy manager
+    MDProjectionStrategyConfiguration* projectionConfig = [[MDProjectionStrategyConfiguration alloc]init];
+    projectionConfig.directorFactory = self.directorFactory;
+    projectionConfig.sizeContext = library.sizeContext;
+    
+    // projectionStrategyManager
+    library.projectionStrategyManager = [[MDProjectionStrategyManager alloc]initWithDefault:self.projectionMode config:projectionConfig];
+    
+    // interactiveStrategyManager
     library.interactiveStrategyManager = [[MDInteractiveStrategyManager alloc]initWithDefault:self.interactiveMode];
+    
+    // displayStrategyManager
     library.displayStrategyManager = [[MDDisplayStrategyManager alloc]initWithDefault:self.displayMode];
+    BarrelDistortionConfig* barrelDistortionConfig = self.barrelDistortionConfig != nil ? self.barrelDistortionConfig : [[BarrelDistortionConfig alloc] init];
+    library.displayStrategyManager.barrelDistortionConfig = barrelDistortionConfig;
+    [library.displayStrategyManager setAntiDistortionEnabled: barrelDistortionConfig.defaultEnabled];
+    
+    // setupStrategyManager
     [library setupStrategyManager];
     
+    // setup plugin manager
+    MDPanoramaPluginBuilder* pluginBuilder = [MDPanoramaPlugin builder];
+    [pluginBuilder setProgram:self.program];
+    [pluginBuilder setTexture:self.texture];
+    [pluginBuilder setProjectionStrategyManager:library.projectionStrategyManager];
+    library.pluginManager = [[MDPluginManager alloc]init];
+    [library.pluginManager add:[pluginBuilder build]];
+    
+    // touch
     library.touchHelper.pinchEnabled = self.pinchEnabled;
+    
+    // display
     [library setupDisplay:self.viewController view:self.view];
     
+    // last step
     [library setup];
+     
     return library;
+}
+
+@end
+
+#pragma mark MDSizeContext
+@interface MDSizeContext(){
+    float textureWidth;
+    float textureHeight;
+    float textureRatio;
+    float viewportWidth;
+    float viewportHeight;
+    float viewportRatio;
+}
+
+@end
+
+@implementation MDSizeContext
+- (instancetype)init{
+    self = [super init];
+    if (self) {
+        [self updateTextureWidth:3 height:2];
+        [self updateViewportWidth:3 height:2];
+    }
+    return self;
+}
+
+- (void)updateTextureWidth:(float)width height:(float) height{
+    textureWidth = width;
+    textureHeight = height;
+    textureRatio = textureWidth / textureHeight;
+}
+
+- (void)updateViewportWidth:(float)width height:(float) height{
+    viewportWidth = width;
+    viewportHeight = height;
+    viewportRatio = viewportWidth / viewportHeight;
+}
+
+- (float) getTextureRatioValue{
+    return self->textureRatio;
+}
+
+- (float) getViewportRatioValue{
+    return self->viewportRatio;
+}
+
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"%f %f %f %f,ratio1=%f,ratio2=%f", textureWidth,textureHeight,viewportWidth,viewportHeight,textureRatio,viewportRatio];
 }
 
 @end

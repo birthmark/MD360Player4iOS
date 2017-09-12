@@ -8,8 +8,14 @@
 
 #import <Foundation/Foundation.h>
 #import "MDModeStrategy.h"
+#import "MDProjectionStrategy.h"
 
-@interface MDInteractiveStrategyManager : MDModeManager
-@property(nonatomic,weak) NSArray* dirctors;
+@protocol IMDInteractiveMode <NSObject>
+@optional
 -(void) handleDragDistX:(float)distX distY:(float)distY;
+@end
+
+@interface MDInteractiveStrategyManager : MDModeManager<IMDInteractiveMode>
+@property(nonatomic,weak) MDProjectionStrategyManager* projectionStrategyManager;
+
 @end

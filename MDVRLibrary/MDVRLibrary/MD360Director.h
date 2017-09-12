@@ -18,14 +18,20 @@
 - (void) shot:(MD360Program*) program;
 - (void) reset;
 - (void) updateProjection:(int)width height:(int)height;
+- (void) updateProjectionNearScale:(float)scale;
+- (void) updateProjection;
 - (void) updateSensorMatrix:(GLKMatrix4)sensor;
 - (void) updateTouch:(float)distX distY:(int)distY;
-- (void) updateProjectionNearScale:(float)scale;
 
+- (float) getRatio;
+- (float) getNear;
+
+- (void) setProjection:(GLKMatrix4)project;
 - (void) setLookX:(float)lookX;
 - (void) setEyeX:(float)eyeX;
 - (void) setAngleX:(float)angleX;
 - (void) setAngleY:(float)angleY;
+- (void) setup;
 
 @end
 
@@ -35,8 +41,13 @@
 - (MD360Director*) createDirector:(int) index;
 @end
 
-#pragma mark MD360DirectorFactory
+#pragma mark MD360DefaultDirectorFactory
 @interface MD360DefaultDirectorFactory : NSObject<MD360DirectorFactory>
+
+@end
+
+#pragma mark MD360OrthogonalDirectorFactory
+@interface MD360OrthogonalDirectorFactory : NSObject<MD360DirectorFactory>
 
 @end
 

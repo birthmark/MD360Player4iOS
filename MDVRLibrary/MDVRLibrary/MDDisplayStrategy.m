@@ -12,18 +12,13 @@
 
 #pragma mark MDDisplayStrategy
 @interface MDDisplayStrategy: NSObject<IMDModeStrategy>
-
 @end
 
 @implementation MDDisplayStrategy
-- (void)dealloc{
+
+- (int) getVisibleSize {
+    return 0;
 }
-
-- (void) off{
-
-}
-
-- (int) getVisibleSize { return 0; }
 
 @end
 
@@ -32,9 +27,6 @@
 @end
 
 @implementation MDNormalStrategy
--(void) on{
-    // [self setVisibleSize:1];
-}
 
 - (int) getVisibleSize {
     return 1;
@@ -46,22 +38,19 @@
 @end
 
 @implementation MDGlassStrategy
--(void) on{
-    // [self setVisibleSize:2];
-}
 
 - (int) getVisibleSize {
-    return 2;
+    return MULTI_SCREEN_SIZE;
 }
 @end
 
 
 #pragma mark MDDisplayStrategyManager
+@interface MDDisplayStrategyManager()
+@property (nonatomic) BOOL antiDistortionEnabled;
+@end
+
 @implementation MDDisplayStrategyManager
-- (void) switchMode{
-    int newMode = self.mMode == MDModeDisplayNormal ? MDModeDisplayGlass : MDModeDisplayNormal;
-    [self switchMode:newMode];
-}
 
 - (id<IMDModeStrategy>) createStrategy:(int)mode{
     MDDisplayStrategy* strategy;
@@ -80,5 +69,17 @@
 - (int) getVisibleSize{
     MDDisplayStrategy* strategy = self.mStrategy;
     return [strategy getVisibleSize];
+}
+
+- (BOOL) isAntiDistortionEnabled {
+    return _antiDistortionEnabled;
+}
+
+- (void) setAntiDistortionEnabled:(BOOL)antiDistortionEnabled {
+    _antiDistortionEnabled = antiDistortionEnabled;
+}
+
+- (NSArray*) createModes{
+    return [[NSArray alloc] initWithObjects:[NSNumber numberWithInt:MDModeDisplayNormal], [NSNumber numberWithInt:MDModeDisplayGlass], nil];
 }
 @end

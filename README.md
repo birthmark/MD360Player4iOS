@@ -9,10 +9,24 @@ It is a lite library to render 360 degree panorama video for iOS.
 
 ## Pod
 ```
-pod 'MD360Player4iOS', '~> 0.3.1'
+pod 'MD360Player4iOS', '~> 1.0.0'
 ```
 
 ## Release Node
+**1.2.0**
+* reactor the project.
+* barrel distortion supported.
+
+**1.1.3.beta**
+* [Working-with-the-IJKPlayer-iOS-version](https://github.com/ashqal/MD360Player4iOS/wiki/Working-with-the-IJKPlayer-iOS-version)
+* Plane projection support.
+
+**1.0.0**
+* make the switch mode public. switchInteractiveMode:(MDModeInteractive)interactiveMode and switchDisplayMode:(MDModeDisplay)displayMode and switchProjectionMode:(MDModeProjection)projectionMode
+* add dome support.
+* add stereo support.
+* switch projection in runtime support.
+
 **0.3.0**
 * Fix crucial bug(e.g. crash, black screen).
 * Custom director factory support.
@@ -84,23 +98,12 @@ self.vrLibrary = [config build];
 
 ## Custom Director Factory
 ```objc
-@interface VideoPlayerViewController ()<MD360DirectorFactory>
+
+@interface CustomDirectorFactory : NSObject<MD360DirectorFactory>
 @end
 
-@implementation VideoPlayerViewController
-...
-- (void) initPlayer{
-   	...
-    /////////////////////////////////////////////////////// MDVRLibrary
-    MDVRConfiguration* config = [MDVRLibrary createConfig];
-   	...
-    [config setDirectorFactory:self]; // pass in the custom factory
-    ...
-    self.vrLibrary = [config build];
-    /////////////////////////////////////////////////////// MDVRLibrary
-}
+@implementation CustomDirectorFactory
 
-// implement the MD360DirectorFactory protocol here.
 - (MD360Director*) createDirector:(int) index{
     MD360Director* director = [[MD360Director alloc]init];
     switch (index) {
@@ -113,7 +116,22 @@ self.vrLibrary = [config build];
     }
     return director;
 }
+
+@end
+
+@implementation VideoPlayerViewController
 ...
+- (void) initPlayer{
+   	...
+    /////////////////////////////////////////////////////// MDVRLibrary
+    MDVRConfiguration* config = [MDVRLibrary createConfig];
+   	...
+    [config [[CustomDirectorFactory alloc]init]]; // pass in the custom factory
+    ...
+    self.vrLibrary = [config build];
+    /////////////////////////////////////////////////////// MDVRLibrary
+}
+
 @end
 
 ```

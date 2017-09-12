@@ -29,10 +29,11 @@
     /////////////////////////////////////////////////////// MDVRLibrary
     MDVRConfiguration* config = [MDVRLibrary createConfig];
     
-    [config displayMode:MDModeDisplayGlass];
-    [config interactiveMode:MDModeInteractiveMotion];
+    [config displayMode:MDModeDisplayNormal];
+    [config interactiveMode:MDModeInteractiveTouch];
+    [config projectionMode:MDModeProjectionDome180];
     [config asImage:self];
-    // [config asVideo:playerItem];
+    
     [config setContainer:self view:self.view];
     [config pinchEnabled:true];
     
@@ -41,19 +42,22 @@
    
 }
 
--(void) onProvideImage:(id<TextureCallback>)callback{
+-(void) onProvideImage:(id<TextureCallback>)callback {
     //
     SDWebImageDownloader *downloader = [SDWebImageDownloader sharedDownloader];
     [downloader downloadImageWithURL:self.mURL options:0
                             progress:^(NSInteger receivedSize, NSInteger expectedSize) {
-                                NSLog(@"progress:%ld/%ld",receivedSize,expectedSize);
+                                NSLog(@"progress:%ld/%ld",(long)receivedSize,(long)expectedSize);
                                 // progression tracking code
                             }
                            completed:^(UIImage *image, NSData *data, NSError *error, BOOL finished) {
                                if ( image && finished) {
                                    // do something with image
                                    if ([callback respondsToSelector:@selector(texture:)]) {
-                                       [callback texture:image];
+                                       
+                                        [callback texture:image];
+                    
+                                       
                                    }
                                }
                            }];
